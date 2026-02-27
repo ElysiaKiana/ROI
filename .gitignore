@@ -4,14 +4,17 @@ venv/
 env/
 ENV/
 
-# 数据集
-data/
+# 数据集目录（保留 Python 脚本，忽略数据文件）
+data/*
+!data/*.py
+!data/**/*.py
 
 # 模型检查点（通常很大）
 checkpoints/
 
 # 输出结果
 outputs/
+outputs_v2/
 
 # Python 缓存
 __pycache__/
