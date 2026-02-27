@@ -1,0 +1,86 @@
+# ============================================================
+# 非对称双流 ROI 生成网络 - 默认配置
+# ============================================================
+
+# --- 模型配置 ---
+model:
+  # IR 分支
+  ir_branch:
+    in_channels: 1          # 红外单通道
+    mid_channels: 16        # 中间通道数
+    out_channels: 32        # 输出通道数
+    num_layers: 3           # 卷积层数
+
+  # RGB 分支 (MobileNetV3-Small)
+  rgb_branch:
+    pretrained: true        # 使用 ImageNet 预训练权重
+    out_channels: 32        # 输出通道数 (对齐 IR 分支)
+    feature_layer: 4        # 取第几层特征 (0-indexed, 越小越浅)
+
+  # CAA 注意力模块
+  caa:
+    in_channels: 64         # 融合后通道数 (ir_out + rgb_out)
+    strip_kernel: 11        # 条带卷积核大小 k
+    reduction: 4            # 通道缩减比
+
+  # 显著性预测头
+  saliency_head:
+    in_channels: 64
+    mid_channels: 32
+    out_channels: 1         # 输出单通道显著性图
+
+# --- ROI 生成配置 ---
+roi:
+  saliency_threshold: 0.5  # 显著性阈值
+  min_area: 100             # 最小目标面积 (像素)
+  # DBSCAN 聚类参数
+  dbscan_eps: 80            # 邻域半径 (像素) — 人体宽度约30-60px@512×640, 80可关联邻近目标
+  dbscan_min_samples: 1     # 最小样本数
+  # ROI 自适应外扩参数
+  padding_ratio: 0.3        # 分离目标外扩比例 (相对bbox尺寸)
+  min_padding: 15           # 最小外扩像素
+  crowd_padding_ratio: 0.25 # 聚集目标外扩比例
+  crowd_threshold: 3        # >= 此数量视为聚集
+  min_roi_size: 64          # 最小 ROI 尺寸 (兜底)
+  jpeg_quality: 85          # JPEG 压缩质量 (计算 data_size_kb)
+
+# --- 数据集配置 ---
+dataset:
+  name: "LLVIP"
+  root: "./data/LLVIP"
+  train_split: 0.8
+  img_size: [512, 640]      # H, W
+  # GT 显著性图生成模式
+  gt_mode: "gaussian"       # "hard" (v1硬矩形) 或 "gaussian" (v2高斯椭圆)
+  sigma_ratio: 0.3          # 高斯 σ = bbox尺寸 × sigma_ratio
+  ir_weighting: true        # 是否用 IR 亮度加权 GT
+  # 数据增强
+  augment:
+    horizontal_flip: true
+    vertical_flip: false
+    random_crop: false
+
+# --- 训练配置 ---
+training:
+  batch_size: 8
+  num_workers: 4
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.0001
+  lr_scheduler: "cosine"    # cosine / step
+  step_size: 30
+  gamma: 0.1
+  # 损失函数权重
+  loss:
+    bce_weight: 1.0         # Focal BCE 权重
+    dice_weight: 1.0        # Dice 损失
+    iou_weight: 0.5         # IoU 损失
+    focal_alpha: 0.75       # Focal Loss 正样本权重 (前景占比小→高α)
+    focal_gamma: 2.0        # Focal Loss 聚焦参数
+
+# --- 输出配置 ---
+output:
+  save_dir: "./outputs"
+  checkpoint_dir: "./checkpoints"
+  log_interval: 10          # 每 N 个 batch 打印日志
+  save_interval: 5          # 每 N 个 epoch 保存模型
